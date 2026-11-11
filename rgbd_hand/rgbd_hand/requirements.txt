@@ -1,0 +1,11 @@
+# Python 3.10
+# 已在 conda env: handgesture 中验证的版本
+mediapipe==0.10.21
+numpy==1.26.4
+opencv-python==4.11.0.86
+open3d==0.18.0
+
+# 深度相机（可选）：不要从 PyPI 装 pyorbbecsdk（那是误标的 macOS 包），
+# 从 https://github.com/orbbec/pyorbbecsdk/releases 下载
+# pyorbbecsdk2-2.1.2-cp310-cp310-win_amd64.whl 后 pip install 该文件。
+# pyorbbecsdk2==2.1.2
