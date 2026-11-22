@@ -1,0 +1,89 @@
+{
+  "view": "camera",
+  "run": 1,
+  "started_at": "2026-11-20T16:15:46.420464+08:00",
+  "camera_backend": "MSMF",
+  "camera_reported_fps": 30.0,
+  "requested_window_size": [
+    1280,
+    720
+  ],
+  "cube_vertices": 8,
+  "cube_triangles": 12,
+  "joint_vertices_each": 182,
+  "joint_triangles_each": 360,
+  "frame_size": [
+    1280,
+    720
+  ],
+  "has_depth": false,
+  "startup_to_first_render_s": 2.6653120999999373,
+  "intrinsic": [
+    [
+      1108.5125168440816,
+      0.0,
+      639.5
+    ],
+    [
+      0.0,
+      1108.5125168440816,
+      359.5
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "extrinsic": [
+    [
+      1.0,
+      0.0,
+      0.0,
+      -0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      -0.0,
+      -0.05
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0,
+      -0.040000000000000036
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "viewport_size": [
+    1280,
+    720
+  ],
+  "camera_preview_requested_size": [
+    960,
+    540
+  ],
+  "camera_preview_image_rect": [
+    1251,
+    471,
+    960,
+    540
+  ],
+  "exit_code": 0,
+  "max_detected_hands": 0,
+  "measured_samples": 330,
+  "warmup_s": 3,
+  "requested_sample_duration_s": 20.0,
+  "mean_loop_fps": 16.498893254238872,
+  "loop_ms_mean": 60.61012606061206,
+  "loop_ms_p95": 70.17220999973688,
+  "render_ms_mean": 11.186789090882513,
+  "render_ms_p95": 13.86435999979767,
+  "frames_with_hands": 0
+}

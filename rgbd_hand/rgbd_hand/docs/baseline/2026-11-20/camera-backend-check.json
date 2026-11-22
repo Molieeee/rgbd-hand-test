@@ -1,0 +1,22 @@
+[
+  {
+    "backend": "MSMF",
+    "opened": true,
+    "width": 1280,
+    "height": 720,
+    "min": 15,
+    "max": 23,
+    "mean": 18.03403247974537,
+    "std": 0.9111939660022234
+  },
+  {
+    "backend": "DSHOW",
+    "opened": true,
+    "width": 1280,
+    "height": 720,
+    "min": 15,
+    "max": 22,
+    "mean": 17.353335141782406,
+    "std": 0.6235734723210513
+  }
+]

@@ -17,9 +17,8 @@
 # 第一次在新机器上运行（需要 Python 3.10，mediapipe 0.10.21 有这个版本的 wheel）
 conda create -n handgesture python=3.10 -y
 conda activate handgesture
+cd rgbd_hand/rgbd_hand  # 从仓库根目录进入项目
 pip install -r requirements.txt
-
-cd rgbd_hand
 
 # 现在没有深度相机：用普通摄像头（MediaPipe world landmarks 提供米制 3D）
 python main.py --source webcam
@@ -111,7 +110,20 @@ render/          Open3D 场景：骨架、关节球、可抓取立方体、桌�
 assets/          hand_landmarker.task（MediaPipe 模型，启动必需）
 requirements.txt 依赖版本（Python 3.10）
 main.py          主循环 + HUD
+workbench_ui.py  独立的 Tkinter 手势交互工作台
 ```
+
+## 手势交互工作台
+
+在 `main.py` 所在目录运行 `python workbench_ui.py`，即可用内置模拟手和立方体预览界面。需要 Python 的 `tkinter` 模块，显示真实摄像头帧时还需要 Pillow。
+
+`python workbench_ui.py --external` 会等待外部数据。接入时由调用方在主线程运行 Tk 窗口，通过 `publish_snapshot()` 提交快照，并用 `poll_actions()` 读取开始、暂停、复位等操作。现有 `main.py` 仍运行原来的 Open3D 场景。
+
+## 「隔空捏泥人」网页方案
+
+- `capture/` 和 `perception/` 可提供相机坐标系下的 21 个三维手部关键点，`interaction/gesture_fsm.py` 可提供捏合和张掌状态。
+- 网页端计划用 Three.js 生成圆柱泥坯，把指尖或掌心从相机坐标系转换到场景坐标系，作为 `Raycaster` 的射线起点。射线命中网格后，把交点转换到网格局部坐标，按距离加权修改附近顶点。捏合向内刻出凹坑，张掌平滑局部凸起。修改后更新顶点缓冲、法线和包围体。
+- 当前仓库已有 Python 手势输入链路、Open3D 抓取演示和 Tkinter UI 原型。浏览器数据接入与 Three.js 网格雕刻待实现。
 
 ## 关键实现说明
 

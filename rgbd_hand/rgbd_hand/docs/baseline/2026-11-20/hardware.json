@@ -1,0 +1,31 @@
+{
+  "captured_at": "2026-11-20T16:17:59.6468774+08:00",
+  "os": {
+    "Caption": "Microsoft Windows 11 家庭版 中文版",
+    "Version": "10.0.26200"
+  },
+  "cpu": {
+    "Name": "Intel(R) Core(TM) Ultra 9 275HX"
+  },
+  "ram_bytes": 33752997888,
+  "gpu": [
+    {
+      "Name": "NVIDIA GeForce RTX 5080 Laptop GPU",
+      "DriverVersion": "32.0.15.9201",
+      "CurrentHorizontalResolution": 2560,
+      "CurrentVerticalResolution": 1600,
+      "CurrentRefreshRate": 240
+    },
+    {
+      "Name": "Intel(R) Graphics",
+      "DriverVersion": "32.0.101.8860",
+      "CurrentHorizontalResolution": null,
+      "CurrentVerticalResolution": null,
+      "CurrentRefreshRate": null
+    }
+  ],
+  "camera": {
+    "Name": "Integrated Camera",
+    "Status": "OK"
+  }
+}

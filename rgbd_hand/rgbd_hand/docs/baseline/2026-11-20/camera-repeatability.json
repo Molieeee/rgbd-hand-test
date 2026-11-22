@@ -1,0 +1,9 @@
+[
+  {
+    "reference_run": 1,
+    "compared_run": 2,
+    "intrinsic_max_abs_difference": 0.0,
+    "extrinsic_max_abs_difference": 0.0,
+    "initial_screenshots_equal": true
+  }
+]

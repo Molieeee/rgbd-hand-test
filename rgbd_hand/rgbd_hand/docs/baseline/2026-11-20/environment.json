@@ -1,0 +1,16 @@
+{
+  "python": "3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]",
+  "executable": "C:\\Users\\20981\\.codex\\environments\\rgbd-hand-baseline\\Scripts\\python.exe",
+  "platform": "Windows-10-10.0.26200-SP0",
+  "versions": {
+    "open3d": "0.18.0",
+    "mediapipe": "0.10.21",
+    "numpy": "1.26.4",
+    "opencv-python": "4.11.0.86"
+  },
+  "source_sha256": {
+    "main.py": "4c08670ba0e7ccc9c7b26108eff21dc7979fcfcbe12e6d28a478bf17f0454a0b",
+    "render/scene.py": "18ea390c254105480d62204cf4baa21c89be178ee744f921262d759ee177d04f",
+    "assets/hand_landmarker.task": "fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1"
+  }
+}
