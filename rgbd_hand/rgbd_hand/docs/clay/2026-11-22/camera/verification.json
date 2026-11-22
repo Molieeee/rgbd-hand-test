@@ -1,0 +1,14 @@
+{
+  "open3d": "0.18.0",
+  "vertices": 5282,
+  "triangles": 10560,
+  "input": "fixed local vertices; no camera",
+  "shape_update_ms": 0.9775999988050899,
+  "changed_vertices": 405,
+  "max_displacement_m": 0.022,
+  "display_matches_current_mesh": true,
+  "dent_survives_pose_and_view": true,
+  "reset_restores_shape_and_pose": true,
+  "display_geometry_reused": true,
+  "final_mesh_version": 5
+}

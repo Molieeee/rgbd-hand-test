@@ -7,8 +7,7 @@
 
 det(M) = +1，所以它同时也可以直接作用在旋转矩阵上。
 
-场景里目前包含：手部骨架（LineSet + 21 个球）、一个可被抓取的立方体、
-以及下方带网格线的桌面（用来给掉落提供落点）。
+场景包含手部骨架与桌面；默认显示抓取立方体，传入 clay 后显示可编辑泥坯。
 """
 from __future__ import annotations
 
@@ -18,6 +17,7 @@ import numpy as np
 import open3d as o3d
 
 from perception.hand3d import HAND_CONNECTIONS, INDEX_TIP, THUMB_TIP
+from .clay_mesh import ClayMesh
 
 SCENE_M = np.diag([1.0, -1.0, -1.0])
 
@@ -119,6 +119,7 @@ class Scene:
         table_size: tuple[float, float] = (0.9, 0.60),
         table_center_z: float = 0.55,
         hfov_deg: float = 60.0,
+        clay: ClayMesh | None = None,
     ):
         self.width = int(width)
         self.height = int(height)
@@ -131,12 +132,16 @@ class Scene:
         self.table_size = tuple(map(float, table_size))
         self.table_center_z = float(table_center_z)
         self.hfov_deg = float(hfov_deg)
-        self.vis = o3d.visualization.Visualizer()
-        self.vis.create_window(window_name=window_name, width=width, height=height)
+        self.vis = o3d.visualization.VisualizerWithKeyCallback()
+        if not self.vis.create_window(window_name=window_name, width=width, height=height):
+            raise RuntimeError("Unable to create Open3D window")
 
         opt = self.vis.get_render_option()
         opt.background_color = np.array([0.08, 0.09, 0.12])
         opt.line_width = 3.0
+        if clay is not None:
+            # Open3D 0.18 的 Python 枚举将顶点法线着色命名为 Color。
+            opt.mesh_shade_option = o3d.visualization.MeshShadeOption.Color
 
         self.hands = [HandVisual(self.vis, joint_radius) for _ in range(max_hands)]
 
@@ -154,7 +159,20 @@ class Scene:
 
         # 先把物体放到初始场景位置，再添加几何体。
         self.box.translate(np.array([0.0, 0.0, -self.focus_distance]), relative=True)
-        self.vis.add_geometry(self.box, reset_bounding_box=True)
+        self.clay = clay
+        self.clay_visual = None
+        self._clay_version = -1
+        self._clay_shape_version = -1
+        self._initial_clay_pose = None
+        if clay is None:
+            self.vis.add_geometry(self.box, reset_bounding_box=True)
+        else:
+            self._initial_clay_pose = clay.pose_scene
+            self.clay_visual = clay.mesh_scene()
+            self._clay_normals = np.asarray(clay.mesh_local().vertex_normals).copy()
+            self._clay_version = clay.version
+            self._clay_shape_version = clay.shape_version
+            self.vis.add_geometry(self.clay_visual, reset_bounding_box=True)
         self._add_table()
         self._frame_view()
 
@@ -300,7 +318,42 @@ class Scene:
 
     # ---- 渲染 ------------------------------------------------------------
 
+    def update_clay(self, vertices_local=None, pose_scene=None) -> None:
+        """提交局部形状和/或场景位姿；同一显示网格原地更新，不重置观察视角。
+
+        D 可先 clay.set_vertices()，再调用 update_clay()。render() 也会同步。
+        拾取方应在同步后使用 clay.mesh_scene() 与 clay.version。
+        """
+        if self.clay is None:
+            raise RuntimeError("Scene was not created with a ClayMesh")
+        if vertices_local is not None:
+            self.clay.set_vertices(vertices_local)
+        if pose_scene is not None:
+            self.clay.set_pose(pose_scene)
+        if self._clay_version == self.clay.version:
+            return
+        if self._clay_shape_version != self.clay.shape_version:
+            self._clay_normals = np.asarray(self.clay.mesh_local().vertex_normals).copy()
+            self._clay_shape_version = self.clay.shape_version
+        pose = self.clay.pose_scene
+        self.clay_visual.vertices = o3d.utility.Vector3dVector(
+            self.clay.vertices_local @ pose[:3, :3].T + pose[:3, 3])
+        self.clay_visual.vertex_normals = o3d.utility.Vector3dVector(
+            self._clay_normals @ pose[:3, :3].T)
+        self.clay_visual.compute_triangle_normals()
+        self.vis.update_geometry(self.clay_visual)
+        self._clay_version = self.clay.version
+
+    def reset_clay(self) -> None:
+        if self.clay is None:
+            raise RuntimeError("Scene was not created with a ClayMesh")
+        self.clay.reset()
+        self.clay.set_pose(self._initial_clay_pose)
+        self.update_clay()
+
     def render(self) -> bool:
+        if self.clay is not None:
+            self.update_clay()
         if not self.vis.poll_events():
             return False
         self.vis.update_renderer()
