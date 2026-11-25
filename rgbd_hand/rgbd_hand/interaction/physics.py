@@ -66,7 +66,8 @@ class FallingObject:
         R = object_T[:3, :3]
         pos = object_T[:3, 3]
         corners = (_CUBE_SIGNS * half_extent) @ R.T + pos
-        lowest_y = float(np.min(corners[:, 1]))
+        # Camera +Y points down: the lowest corners have the largest Y.
+        lowest_y = float(np.max(corners[:, 1]))
         lowest_corners = corners[
             np.isclose(corners[:, 1], lowest_y, rtol=0.0, atol=1e-9)
         ]
