@@ -26,7 +26,14 @@ import numpy as np
 
 from capture import Recorder, ReplaySource, WebcamSource
 from interaction import FallingObject, GestureFSM, Manipulator
-from perception import DepthHand3D, EMAFilter, HandLandmarkerWrapper, WebcamHand3D
+from perception import (
+    DepthHand3D,
+    EMAFilter,
+    HandLandmarkerWrapper,
+    WebcamHand3D,
+    assign_hand_slots,
+    handedness_label,
+)
 from perception.hand3d import HAND_CONNECTIONS, INDEX_TIP, THUMB_TIP
 from render import Scene
 
@@ -98,7 +105,7 @@ def parse_args(argv=None):
     p.add_argument("--replay-dir", type=str, default=None)
     p.add_argument("--loop", action="store_true", help="回放循环")
     p.add_argument("--ema", type=float, default=0.7, help="EMA 系数，越大越平滑")
-    p.add_argument("--grab-radius", type=float, default=0.12, help="抓取判定半径 (m)")
+    p.add_argument("--grab-radius", type=float, default=0.08, help="抓取判定半径 (m)")
     p.add_argument("--object-pos", type=float, nargs=3, default=None,
                    help="物体初始位置（相机坐标，米）；默认悬停在桌面上方")
     p.add_argument("--table-top", type=float, default=TABLE_TOP,
@@ -158,6 +165,7 @@ def main(argv=None) -> int:
 
     object_T = initial_object_T(object_pos)
     object_T0 = object_T.copy()
+    primary_slot: int | None = None
 
     cv2.namedWindow("RGBD Hand - camera", cv2.WINDOW_NORMAL)
     cv2.resizeWindow("RGBD Hand - camera", min(args.width, 960), min(args.height, 540))
@@ -185,6 +193,8 @@ def main(argv=None) -> int:
             fps = inst_fps if fps == 0.0 else 0.9 * fps + 0.1 * inst_fps
 
             webcam_provider.aspect = frame.color.shape[1] / frame.color.shape[0]
+            # MediaPipe always sees the original camera frame. mirror only
+            # changes the preview overlay, never the 3D hand coordinates.
             result = landmarker.detect(frame.color, frame.timestamp_ms)
 
             if frame.has_depth:
@@ -195,33 +205,98 @@ def main(argv=None) -> int:
             else:
                 provider = webcam_provider
 
-            hands = []
+            hand_count = min(
+                len(result.hand_landmarks),
+                len(result.hand_world_landmarks),
+                len(filters),
+            )
+            detected_handedness = getattr(result, "handedness", []) or []
+            hand_labels = [
+                handedness_label(detected_handedness[i])
+                if i < len(detected_handedness)
+                else None
+                for i in range(hand_count)
+            ]
+            assigned_slots = assign_hand_slots(hand_labels, max_hands=len(filters))
+
+            # Slot 0 is the left hand and slot 1 is the right hand. This keeps
+            # EMA and gesture state attached to the same physical hand even if
+            # MediaPipe changes the order of its detections.
+            hands_by_slot = [None] * len(filters)
             for i, (landmarks, world) in enumerate(
                 zip(result.hand_landmarks, result.hand_world_landmarks)
             ):
-                if i >= len(filters):
+                if i >= hand_count:
                     break
+                slot = assigned_slots[i]
+                if slot is None:
+                    continue
                 pts = provider.to_camera3d(landmarks, world, frame.depth, frame.K)
-                pts = filters[i].update(pts)
-                state = fsms[i].update(pts)
-                hands.append((pts, state))
+                pts = filters[slot].update(pts)
+                state = fsms[slot].update(pts)
+                hands_by_slot[slot] = (landmarks, pts, state)
 
             # 消失的手要清掉平滑器和状态，避免再次出现时跳变
-            for i in range(len(filters)):
-                if i >= len(hands):
-                    filters[i].reset()
-                    fsms[i].reset()
+            for slot, observation in enumerate(hands_by_slot):
+                if observation is None:
+                    filters[slot].reset()
+                    fsms[slot].reset()
+
+            hands = [observation for observation in hands_by_slot if observation is not None]
 
             primary = None
-            for pts, state in hands:
-                if state.pinching:
-                    primary = (pts, state)
-                    break
-            if primary is None and hands:
-                primary = hands[0]
+            if manipulator.grabbed:
+                # Keep control with the detected hand closest to the held object.
+                # This survives a transient handedness-label swap.
+                grab_candidates = [
+                    (slot, observation)
+                    for slot, observation in enumerate(hands_by_slot)
+                    if observation is not None
+                ]
+                if grab_candidates:
+                    nearest = min(
+                        grab_candidates,
+                        key=lambda item: (
+                            float(np.linalg.norm(item[1][2].pinch_point - object_T[:3, 3]))
+                            if item[1][2].pinch_point is not None
+                            else np.inf
+                        ),
+                    )
+                    nearest_dist = (
+                        float(np.linalg.norm(nearest[1][2].pinch_point - object_T[:3, 3]))
+                        if nearest[1][2].pinch_point is not None
+                        else np.inf
+                    )
+                    if nearest_dist <= max(args.grab_radius * 2.0, 0.12):
+                        primary_slot, primary = nearest
+            else:
+                pinching_hands = [
+                    (slot, observation)
+                    for slot, observation in enumerate(hands_by_slot)
+                    if observation is not None and observation[2].pinching
+                ]
+                if pinching_hands:
+                    # With two pinching hands, use the one closest to the object.
+                    primary_slot, primary = min(
+                        pinching_hands,
+                        key=lambda item: (
+                            float(np.linalg.norm(item[1][2].pinch_point - object_T[:3, 3]))
+                            if item[1][2].pinch_point is not None
+                            else np.inf
+                        ),
+                    )
+                elif primary_slot is not None and hands_by_slot[primary_slot] is not None:
+                    primary = hands_by_slot[primary_slot]
+                elif hands:
+                    primary_slot = next(
+                        slot
+                        for slot, observation in enumerate(hands_by_slot)
+                        if observation is not None
+                    )
+                    primary = hands_by_slot[primary_slot]
 
             if primary is not None:
-                _, state = primary
+                state = primary[2]
                 object_T, grabbed = manipulator.update(
                     state.hand_T, state.pinching, object_T, dt
                 )
@@ -232,24 +307,29 @@ def main(argv=None) -> int:
 
             # 捏合点到方块中心的距离：HUD 里显示，方块进入抓取范围时会变色。
             pinch_dist = None
-            if primary is not None and primary[1].pinch_point is not None:
+            if primary is not None and primary[2].pinch_point is not None:
                 pinch_dist = float(
-                    np.linalg.norm(primary[1].pinch_point - object_T[:3, 3])
+                    np.linalg.norm(primary[2].pinch_point - object_T[:3, 3])
                 )
             near = (not grabbed) and pinch_dist is not None and pinch_dist < args.grab_radius
 
             display = cv2.flip(frame.color, 1) if mirror else frame.color.copy()
-            for landmarks, (_, state) in zip(result.hand_landmarks, hands):
+            for landmarks, _, state in hands:
                 draw_hand_2d(display, landmarks, state.pinching, mirror=mirror)
 
             # 松手后重力接管，落到桌面上停住；抓取中速度清零。
             object_T = falling.update(object_T, grabbed, dt, OBJECT_SIZE / 2.0)
 
-            scene.update_hands([pts for pts, _ in hands], [s.pinching for _, s in hands])
+            scene.update_hands(
+                [pts for _, pts, _ in hands],
+                [state.pinching for _, _, state in hands],
+            )
             scene.update_object(object_T, grabbed, near)
 
-            pinch_ratio = primary[1].pinch_ratio if primary is not None else 0.0
-            mode = "GRAB" if grabbed else ("PINCH" if primary is not None and primary[1].pinching else "IDLE")
+            pinch_ratio = primary[2].pinch_ratio if primary is not None else 0.0
+            mode = "GRAB" if grabbed else (
+                "PINCH" if primary is not None and primary[2].pinching else "IDLE"
+            )
             dist_text = f"{pinch_dist:.3f}" if pinch_dist is not None else " --  "
             hud = [
                 f"source: {args.source}   depth: {'ON' if frame.has_depth else 'OFF'}",
@@ -276,6 +356,7 @@ def main(argv=None) -> int:
                 break
             if key == ord("r"):
                 object_T = object_T0.copy()
+                primary_slot = None
                 manipulator.reset()
                 falling.reset()
                 for fsm in fsms:
