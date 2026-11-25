@@ -1,6 +1,6 @@
 # D01/D02 局部网格雕刻验收（2026-11-25）
 
-本目录是 D（罗淇玥）负责的 `interaction/sculpt.py` 的第一阶段验收材料：
+本文件记录 D（罗淇玥）负责的 `interaction/sculpt.py` 的第一阶段验收：
 D01 手动局部坐标雕刻、D02 邻域/背面/端面/接缝处理。D03 连续深度与限幅、
 D04 邻域均值平滑、D05 笔画插值和快照接口已经实现并有单元测试；D06 的
 完整 benchmark 和实验图在后续补充。
@@ -11,7 +11,7 @@ D04 邻域均值平滑、D05 笔画插值和快照接口已经实现并有单元
 cd rgbd_hand\rgbd_hand
 python -m unittest discover -s tests -v
 python sculpt_demo.py
-python sculpt_demo.py --verify-dir docs\sculpt\2026-11-25
+python sculpt_demo.py --verify-dir %TEMP%\sculpt_verify
 ```
 
 窗口按键：
@@ -128,12 +128,9 @@ mean_i = mean(v_j, j ∈ N(i))          # N(i) 用更新前的顶点副本
 `update_clay` 的耗时包含 `clay.set_vertices`、顶点法线重算和
 `vis.update_geometry`，不含窗口渲染。显示对象 `clay_visual` 没有被重建。
 
-截图：
-
-- `01-initial.png`：初始泥坯
-- `02-carve-final.png`：12 mm 凹坑（正面）
-- `03-backside.png`：转 180° 后的背面，没有凸起/凹坑
-- `04-reset.png`：复位
+验收时 `--verify-dir` 会生成 `01-initial.png`（初始）、`02-carve-final.png`
+（12 mm 凹坑）、`03-backside.png`（转 180° 后的背面）和 `04-reset.png`
+（复位），以及 `verification.json`。这些是报告用的证据，默认不提交仓库。
 
 ## 单元测试
 
