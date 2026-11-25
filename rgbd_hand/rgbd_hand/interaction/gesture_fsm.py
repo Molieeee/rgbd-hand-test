@@ -18,15 +18,15 @@ import numpy as np
 from perception.hand3d import INDEX_MCP, INDEX_TIP, MIDDLE_MCP, PINKY_MCP, THUMB_TIP, WRIST
 
 # 归一化阈值（除以 wrist -> middle MCP 的距离）
-PINCH_ON_RATIO = 0.40
+PINCH_ON_RATIO = 0.50
 # 松开阈值要比捏合阈值高很多：world landmarks 的深度（z）有噪声，
 # 明明捏着的时候 |拇指尖-食指尖| 的三维距离也可能偏大。松开要求
 # “明显张开”，并且连续多帧，避免捏着捏着被误判成松开。
-PINCH_OFF_RATIO = 0.75
+PINCH_OFF_RATIO = 0.85
 FIST_RATIO = 1.10
 PALM_RATIO = 1.50
-STABLE_FRAMES = 3
-RELEASE_FRAMES = 8
+STABLE_FRAMES = 2
+RELEASE_FRAMES = 10
 
 TIP_IDS = [8, 12, 16, 20]
 

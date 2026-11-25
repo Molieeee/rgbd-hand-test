@@ -1,6 +1,7 @@
 """MediaPipe HandLandmarker 封装。
 
 用 Tasks API（不是旧的 mp.solutions），输出：
+- handedness:           每只手的左右手分类及置信度
 - hand_landmarks:       21 个归一化图像坐标 (x, y, z)
 - hand_world_landmarks: 21 个公制手部坐标 (米)，原点在手部几何中心
 
