@@ -20,6 +20,10 @@ conda activate handgesture
 cd rgbd_hand/rgbd_hand  # 从仓库根目录进入项目
 pip install -r requirements.txt
 
+# 默认启动泥坯工作台和 Open3D 窗口，不需要摄像头
+python main.py
+# 同一入口，也可以运行 python workbench_ui.py
+
 # 现在没有深度相机：用普通摄像头（MediaPipe world landmarks 提供米制 3D）
 python main.py --source webcam
 
@@ -28,9 +32,21 @@ python main.py --source orbbec --width 640 --height 480
 
 # 回放录制的测试数据
 python main.py --source replay --replay-dir data/demo --loop
+
+# 只显示泥坯三维窗口
+python main.py --no-ui
+
+# 原立方体抓取演示（仍需摄像头或回放）
+python main.py --scene cube --source webcam
 ```
 
-按键：`q` / `ESC` 退出，`r` 把物体复位。
+默认工作台展示圆柱泥坯和桌面，按钮可放置固定演示凹坑、应用演示参数、转动泥坯、暂停和复位。工作台中央画面来自 Open3D 实际渲染，鼠标拖动观察、滚轮缩放。独立 Open3D 窗口中 `D` 放置凹坑、`R` 复位、`A/F` 转动、`V` 恢复视角、`Q` 或 `Esc` 退出。
+
+场景采用灰陶泥坯、双层陶艺转盘和浅木桌，参考网格默认关闭。工作台使用暖灰与鼠尾草绿配色，常用操作在视图下方，显示选项和模型数据可折叠。配置与坐标变化见 [陶艺工作室视觉更新](docs/clay/studio-design.md)。
+
+`--source webcam/orbbec/replay` 将输入骨架显示到泥坯场景；当前没有接入射线拾取和手势雕刻，固定凹坑按钮仅用于显示联调。输入源失败不会关闭泥坯场景，可在侧栏切回 `demo`。回放目录通过 `--replay-dir` 指定。完整接入说明见 [泥坯工作台](docs/clay/workbench-integration.md)。
+
+以下立方体抓取、重力等说明对应 `--scene cube` 模式。
 
 ## 视角：第一人称“手伸进屏幕”
 
@@ -121,15 +137,15 @@ workbench_ui.py  独立的 Tkinter 手势交互工作台
 
 ## 手势交互工作台
 
-在 `main.py` 所在目录运行 `python workbench_ui.py`，即可用内置模拟手和立方体预览界面。需要 Python 的 `tkinter` 模块，显示真实摄像头帧时还需要 Pillow。
+在 `main.py` 所在目录运行 `python workbench_ui.py`，默认连接 Open3D 泥坯后端。需要 Python 的 `tkinter` 模块和 `requirements.txt` 中的 Pillow。使用 `--legacy-demo` 才启动原模拟手与立方体 Canvas 原型。
 
-`python workbench_ui.py --external` 会等待外部数据。接入时由调用方在主线程运行 Tk 窗口，通过 `publish_snapshot()` 提交快照，并用 `poll_actions()` 读取开始、暂停、复位等操作。现有 `main.py` 仍运行原来的 Open3D 场景。
+`python workbench_ui.py --external` 保留等待外部数据的原型接口。新的 `workbench_app.py` 在主进程运行 Tk，通过有界队列向独立 Open3D 进程传动作和最新快照；窗口关闭时清理后端。`main.py` 默认使用该集成入口，原抓取场景使用 `--scene cube`。
 
-## 「隔空捏泥人」网页方案
+## 「隔空捏泥人」本地方案
 
 - `capture/` 和 `perception/` 可提供相机坐标系下的 21 个三维手部关键点，`interaction/gesture_fsm.py` 可提供捏合和张掌状态。
-- 网页端计划用 Three.js 生成圆柱泥坯，把指尖或掌心从相机坐标系转换到场景坐标系，作为 `Raycaster` 的射线起点。射线命中网格后，把交点转换到网格局部坐标，按距离加权修改附近顶点。捏合向内刻出凹坑，张掌平滑局部凸起。修改后更新顶点缓冲、法线和包围体。
-- 当前仓库已有 Python 手势输入链路、Open3D 抓取演示和 Tkinter UI 原型。浏览器数据接入与 Three.js 网格雕刻待实现。
+- 当前使用本地 Tkinter 工作台与独立 Open3D 窗口。圆柱泥坯和局部形状刷新已实现，工作台显示实际三维渲染画面，并能演示凹坑与复位。
+- 后续由拾取模块将射线交点转到泥坯局部坐标，再由雕刻模块修改附近顶点，实现捏合挖坑与张掌平滑。当前固定凹坑按钮用于显示验证，尚未接入真实手势雕刻。
 
 ## 关键实现说明
 
