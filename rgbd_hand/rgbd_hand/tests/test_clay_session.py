@@ -8,6 +8,26 @@ import main
 
 
 class ClaySessionTests(unittest.TestCase):
+    def test_minimized_preview_keeps_last_valid_frame(self):
+        from clay_runtime import preview_frame
+        image = np.zeros((64, 64, 3))
+        image[32:] = .6
+        previous, suspended = preview_frame(image)
+        self.assertFalse(suspended)
+        retained, suspended = preview_frame(np.full((64, 64, 3), .15), previous)
+        self.assertTrue(suspended)
+        self.assertIs(retained, previous)
+        retained, suspended = preview_frame(np.zeros((0, 0, 3)), previous)
+        self.assertTrue(suspended)
+        self.assertIs(retained, previous)
+
+    def test_clay_sits_on_turntable_and_grid_starts_hidden(self):
+        from render.studio import TURNTABLE_HEIGHT
+        session = ClaySession(table_top=.2)
+        bottom = session.clay.pose_scene[1, 3] - session.clay.height / 2
+        self.assertAlmostEqual(bottom, -.2 + TURNTABLE_HEIGHT)
+        self.assertFalse(session.grid)
+
     def test_pause_reset_and_parameter_application(self):
         session = ClaySession()
         session.action({"type": "configure", "brush_radius_m": .03, "demo_depth_m": .01})

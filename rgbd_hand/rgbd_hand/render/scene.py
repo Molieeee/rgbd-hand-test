@@ -18,6 +18,7 @@ import open3d as o3d
 
 from perception.hand3d import HAND_CONNECTIONS, INDEX_TIP, THUMB_TIP
 from .clay_mesh import ClayMesh
+from .studio import add_studio, configure_studio_lighting
 
 SCENE_M = np.diag([1.0, -1.0, -1.0])
 
@@ -140,6 +141,7 @@ class Scene:
         opt.background_color = np.array([0.08, 0.09, 0.12])
         opt.line_width = 3.0
         if clay is not None:
+            configure_studio_lighting(opt)
             # Open3D 0.18 的 Python 枚举将顶点法线着色命名为 Color。
             opt.mesh_shade_option = o3d.visualization.MeshShadeOption.Color
 
@@ -174,31 +176,40 @@ class Scene:
             self._clay_shape_version = clay.shape_version
             self.vis.add_geometry(self.clay_visual, reset_bounding_box=True)
         self._add_table()
+        if clay is not None:
+            self.set_grid_visible(False)
         self._frame_view()
 
     def _add_table(self) -> None:
         """桌面：一块薄板 + 顶面网格线，帮助判断高度。"""
         sx, sz = self.table_size
+        center_z = self.table_center_z
+        if self.clay is not None:
+            sx, sz = .78, .56
+            center_z = -self.clay.pose_scene[2, 3]
         thickness = 0.02
         top_scene_y = -self.table_top
         center = np.array([0.0, top_scene_y - thickness / 2.0, -self.table_center_z])
 
-        slab = o3d.geometry.TriangleMesh.create_box(sx, thickness, sz)
-        slab.translate(center - np.array([sx / 2.0, thickness / 2.0, sz / 2.0]))
-        slab.paint_uniform_color(TABLE_COLOR)
-        slab.compute_vertex_normals()
-        self.vis.add_geometry(slab, reset_bounding_box=True)
+        if self.clay is not None:
+            self.studio_geometry = add_studio(self.vis, self.clay, self.table_top)
+        else:
+            slab = o3d.geometry.TriangleMesh.create_box(sx, thickness, sz)
+            slab.translate(center - np.array([sx / 2.0, thickness / 2.0, sz / 2.0]))
+            slab.paint_uniform_color(TABLE_COLOR)
+            slab.compute_vertex_normals()
+            self.vis.add_geometry(slab, reset_bounding_box=True)
 
         n = 6
         gx = np.linspace(-sx / 2.0, sx / 2.0, n)
-        gz = np.linspace(-self.table_center_z - sz / 2.0, -self.table_center_z + sz / 2.0, n)
+        gz = np.linspace(-center_z - sz / 2.0, -center_z + sz / 2.0, n)
         y = top_scene_y + 0.001
         points, lines = [], []
         for z in gz:
             points.extend([[-sx / 2.0, y, z], [sx / 2.0, y, z]])
         for x in gx:
-            points.extend([[x, y, -self.table_center_z - sz / 2.0],
-                           [x, y, -self.table_center_z + sz / 2.0]])
+            points.extend([[x, y, -center_z - sz / 2.0],
+                           [x, y, -center_z + sz / 2.0]])
         count = len(points) // 2
         lines = [[2 * i, 2 * i + 1] for i in range(count)]
         grid = o3d.geometry.LineSet(
@@ -261,6 +272,14 @@ class Scene:
             eye = target + np.array([0.0, self.eye_height, -self.eye_distance])
         else:
             eye = target + np.array([0.0, 0.0, 0.38])
+        if self.clay is not None:
+            # 将泥坯和转盘作为主角；只调整观察相机，不改变手部坐标。
+            target = self.clay.pose_scene[:3, 3].copy()
+            target[1] -= .025
+            if self.first_person:
+                eye = target + np.array([.045, self.eye_height * .72, -self.eye_distance * 1.02])
+            else:
+                eye = target + np.array([-.045, .11, .45])
         up = np.array([0.0, 1.0, 0.0])
         front = target - eye
         front /= np.linalg.norm(front)

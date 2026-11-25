@@ -30,7 +30,7 @@ $pythonExe = 'C:/Users/20981/.codex/environments/rgbd-hand-baseline/Scripts/pyth
 
 ## B02 几何约定
 
-`render/clay_mesh.py` 中的 `ClayMesh` 使用局部 +Y 轴，原点在几何中心。默认半径 0.075 m、高 0.18 m，默认场景中心为 `(0, -0.09, -0.50)` m，底面正好位于桌面场景 y=-0.18 m。
+`render/clay_mesh.py` 中的 `ClayMesh` 使用局部 +Y 轴，原点在几何中心。默认半径 0.075 m、高 0.18 m。11月22日的基线中心为 `(0, -0.09, -0.50)` m，底面位于桌面 y=-0.18 m。11月25日工作室场景增加 28 mm 转盘后，默认中心为 `(0, -0.062, -0.50)` m，底面位于转盘顶面 y=-0.152 m，详见 [视觉更新](studio-design.md)。
 
 令 n 为周向段数、h 为高度段数、c 为端面径向段数：
 

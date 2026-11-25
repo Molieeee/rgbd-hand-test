@@ -8,22 +8,31 @@ import numpy as np
 
 from clay_demo import demo_dent
 from render import ClayMesh, Scene
+from render.studio import clay_studio_pose
+
+
+def preview_frame(image, previous=None):
+    """最小化窗口可能返回空帧或纯背景，保留上一张有效画面。"""
+    image = np.asarray(image)
+    valid = (image.ndim == 3 and image.shape[0] > 16 and image.shape[1] > 16
+             and image.shape[2] == 3 and np.isfinite(image[::16, ::16]).all()
+             and np.max(np.std(image[::16, ::16], axis=(0, 1))) > .003)
+    return (np.clip(image * 255, 0, 255).astype(np.uint8) if valid else previous), not valid
 
 
 class ClaySession:
     """UI 与独立窗口共享的状态；固定凹坑仅用于显示联调。"""
     def __init__(self, table_top=.18):
-        self.clay = ClayMesh()
-        pose = np.eye(4)
-        pose[:3, 3] = [0, -table_top + self.clay.height / 2, -.5]
+        self.clay = ClayMesh(edge_rounding=.004)
+        pose = clay_studio_pose(self.clay, table_top)
         self.clay.set_pose(pose)
         self.initial_pose = pose.copy()
         self.running = True
         self.radius_m = .04875
         self.depth_m = .022
         self.skeleton = True
-        self.grid = True
-        self.message = "泥坯已就绪；演示凹坑是固定坐标验证，不由手势触发"
+        self.grid = False
+        self.message = "拖动观察泥坯，或点击下方「演示凹坑」体验形状变化。"
 
     def action(self, action, first_person=True):
         kind = action.get("type")
@@ -77,6 +86,7 @@ def run_clay(args, publish=None, poll_actions=None, should_stop=None):
     selected_source = args.source
     error = ""
     hands, camera = [], None
+    preview = None
     depth_enabled = False
     frames = 0
     started = last_publish = time.perf_counter()
@@ -222,10 +232,11 @@ def run_clay(args, publish=None, poll_actions=None, should_stop=None):
             if publish and now - last_publish >= .1:
                 snap = session.snapshot()
                 image = np.asarray(scene.vis.capture_screen_float_buffer(do_render=False))
+                preview, view_suspended = preview_frame(image, preview)
                 snap.update(source=selected_source, hands=hands, camera_bgr=camera,
                             depth_enabled=depth_enabled, error=error,
                             fps=frames / max(now - started, .001),
-                            scene_rgb=np.clip(image * 255, 0, 255).astype(np.uint8))
+                            scene_rgb=preview, view_suspended=view_suspended)
                 publish(snap)
                 last_publish = now
             time.sleep(.005)

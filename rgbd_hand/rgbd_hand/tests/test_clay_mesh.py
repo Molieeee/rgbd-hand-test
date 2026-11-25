@@ -56,6 +56,24 @@ class ClayMeshTests(unittest.TestCase):
         np.testing.assert_array_equal(clay.triangles, triangles)
         self.assertEqual(clay.pose_scene[2, 3], -.5)
 
+    def test_rounded_rim_keeps_topology_extents_and_closed_surface(self):
+        clay = ClayMesh(edge_rounding=.004)
+        original = ClayMesh()
+        mesh = clay.mesh_local()
+        np.testing.assert_array_equal(clay.triangles, original.triangles)
+        points = clay.vertices_local
+        self.assertTrue(mesh.is_watertight())
+        self.assertFalse(mesh.is_self_intersecting())
+        self.assertTrue(np.isfinite(np.asarray(mesh.vertex_normals)).all())
+        self.assertAlmostEqual(points[:, 1].min(), -clay.height / 2)
+        self.assertAlmostEqual(points[:, 1].max(), clay.height / 2)
+        self.assertAlmostEqual(np.linalg.norm(points[:, [0, 2]], axis=1).max(), clay.radius)
+        first_ring = points[:clay.radial_segments]
+        np.testing.assert_allclose(np.linalg.norm(first_ring[:, [0, 2]], axis=1), clay.radius - .004)
+        clay.set_vertices(points + [0, .001, 0])
+        clay.reset()
+        np.testing.assert_array_equal(clay.vertices_local, points)
+
     def test_reject_invalid_input_without_mutation(self):
         for kwargs in ({"radius": 0}, {"height": float("nan")},
                        {"radial_segments": 2}, {"height_segments": 1.5},

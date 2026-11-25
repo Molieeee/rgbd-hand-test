@@ -8,12 +8,12 @@ from __future__ import annotations
 import numpy as np
 import open3d as o3d
 
-CLAY_COLOR = (0.70, 0.43, 0.29)
+CLAY_COLOR = (0.70, 0.665, 0.62)
 
 
 class ClayMesh:
     def __init__(self, radius=0.075, height=0.18, radial_segments=96,
-                 height_segments=48, cap_segments=4):
+                 height_segments=48, cap_segments=4, edge_rounding=0.0):
         for name, value in (("radius", radius), ("height", height)):
             if not np.isfinite(value) or value <= 0:
                 raise ValueError(f"{name} must be positive and finite")
@@ -23,6 +23,9 @@ class ClayMesh:
             if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)) or value < minimum:
                 raise ValueError(f"{name} must be an integer >= {minimum}")
         self.radius, self.height = float(radius), float(height)
+        if not np.isfinite(edge_rounding) or not 0 <= edge_rounding < min(radius, height / 2):
+            raise ValueError("edge_rounding must be finite and smaller than radius and half height")
+        self.edge_rounding = float(edge_rounding)
         self.radial_segments = n = int(radial_segments)
         self.height_segments = h = int(height_segments)
         self.cap_segments = int(cap_segments)
@@ -30,7 +33,12 @@ class ClayMesh:
         circle = np.column_stack((np.cos(theta), np.zeros(n), np.sin(theta)))
         vertices, faces = [], []
         for y in np.linspace(-height / 2, height / 2, h + 1):
-            ring = radius * circle.copy()
+            distance = height / 2 - abs(y)
+            ring_radius = radius
+            if self.edge_rounding and distance < self.edge_rounding:
+                ring_radius = radius - self.edge_rounding + np.sqrt(
+                    max(0, self.edge_rounding ** 2 - (self.edge_rounding - distance) ** 2))
+            ring = ring_radius * circle.copy()
             ring[:, 1] = y
             vertices.extend(ring)
         for row in range(h):
@@ -43,7 +51,7 @@ class ClayMesh:
             y = height / 2 if top else -height / 2
             for level in range(self.cap_segments - 1, 0, -1):
                 inner = np.arange(n) + len(vertices)
-                ring = radius * level / self.cap_segments * circle.copy()
+                ring = (radius - self.edge_rounding) * level / self.cap_segments * circle.copy()
                 ring[:, 1] = y
                 vertices.extend(ring)
                 for j in range(n):

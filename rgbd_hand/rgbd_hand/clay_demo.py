@@ -10,6 +10,7 @@ import numpy as np
 import open3d as o3d
 
 from render import ClayMesh, Scene
+from render.studio import clay_studio_pose
 
 
 def demo_dent(clay, front_sign=-1, brush_radius=None, depth=None):
@@ -87,9 +88,9 @@ def main():
     parser.add_argument("--verify-dir", type=Path)
     args = parser.parse_args()
     clay = ClayMesh(args.radius, args.height, args.radial_segments,
-                    args.height_segments, args.cap_segments)
-    pose = np.eye(4)
-    pose[:3, 3] = [0, -.18 + clay.height / 2, -.50]
+                    args.height_segments, args.cap_segments,
+                    edge_rounding=min(.004, args.radius * .1, args.height * .1))
+    pose = clay_studio_pose(clay)
     clay.set_pose(pose)
     scene = Scene(window_name="Clay Workbench | D: dent  R: reset  A/F: turn  V: view  Q: quit",
                   clay=clay, focus_distance=.50, look_at_y=-pose[1, 3],
