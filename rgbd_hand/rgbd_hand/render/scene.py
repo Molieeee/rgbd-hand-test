@@ -207,6 +207,17 @@ class Scene:
         )
         grid.colors = o3d.utility.Vector3dVector(np.tile(GRID_COLOR, (len(lines), 1)))
         self.vis.add_geometry(grid, reset_bounding_box=False)
+        self.grid = grid
+        self._grid_visible = True
+
+    def set_grid_visible(self, visible: bool) -> None:
+        if bool(visible) == self._grid_visible:
+            return
+        if visible:
+            self.vis.add_geometry(self.grid, reset_bounding_box=False)
+        else:
+            self.vis.remove_geometry(self.grid, reset_bounding_box=False)
+        self._grid_visible = bool(visible)
 
     def _frame_view(self) -> None:
         """设置相机。

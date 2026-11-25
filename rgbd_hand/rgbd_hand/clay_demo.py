@@ -12,18 +12,19 @@ import open3d as o3d
 from render import ClayMesh, Scene
 
 
-def demo_dent(clay, front_sign=-1):
+def demo_dent(clay, front_sign=-1, brush_radius=None, depth=None):
     """固定局部坐标的显示夹具，不是 D 的连续笔刷算法。"""
     vertices = clay.initial_vertices
     center = np.array([0, 0, front_sign * clay.radius])
     distance = np.linalg.norm(vertices - center, axis=1)
-    brush_radius = min(clay.radius * .65, clay.height * .35)
+    brush_radius = brush_radius if brush_radius is not None else min(clay.radius * .65, clay.height * .35)
     weight = np.maximum(0, 1 - (distance / brush_radius) ** 2) ** 2
     # 仅前侧侧面；端面及半径外顶点保持不变。
     selected = np.zeros(len(vertices), dtype=bool)
     selected[clay.side_vertex_indices] = True
     selected &= (front_sign * vertices[:, 2] > 0) & (np.abs(vertices[:, 1]) < clay.height / 2)
-    vertices[selected, 2] -= front_sign * min(.022, clay.radius * .3) * weight[selected]
+    depth = depth if depth is not None else min(.022, clay.radius * .3)
+    vertices[selected, 2] -= front_sign * depth * weight[selected]
     return vertices
 
 

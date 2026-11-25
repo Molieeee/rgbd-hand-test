@@ -4,6 +4,7 @@ mediapipe==0.10.21
 numpy==1.26.4
 opencv-python==4.11.0.86
 open3d==0.18.0
+Pillow>=10,<13
 
 # 深度相机（可选）：不要从 PyPI 装 pyorbbecsdk（那是误标的 macOS 包），
 # 从 https://github.com/orbbec/pyorbbecsdk/releases 下载

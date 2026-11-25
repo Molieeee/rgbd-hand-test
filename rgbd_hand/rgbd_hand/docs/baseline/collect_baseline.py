@@ -150,6 +150,7 @@ def measure(args, output, run_number):
     cv2.waitKey = wait_key
     try:
         details["exit_code"] = app.main([
+            "--scene", "cube", "--no-ui",
             "--source", "webcam", "--camera", str(args.camera), "--view", args.view,
             "--width", str(args.width), "--height", str(args.height),
         ])

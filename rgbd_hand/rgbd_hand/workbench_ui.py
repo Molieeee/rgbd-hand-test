@@ -1,7 +1,10 @@
-"""手势交互工作台：独立 UI 原型，不导入或修改现有业务模块。
+"""泥坯工作台 UI；默认通过 workbench_app 连接真实 Open3D 后端。
+
+运行 python workbench_ui.py 或 python main.py 均启动泥坯工作台。
+--legacy-demo 保留原立方体 Canvas 模拟；--external 保留快照接入原型。
 
 运行：python workbench_ui.py
-仅需要 Python 自带 tkinter；显示真实 camera_bgr 时额外使用 Pillow。
+默认需要项目 Open3D/NumPy 环境、tkinter 与 Pillow；原立方体 Canvas 原型仅需 tkinter。
 
 接入方式（Tk 窗口及 mainloop 必须在主线程运行）：
     app = HandWorkbench(demo=False)
@@ -14,8 +17,8 @@
 
 publish_snapshot 保留最新一帧，不累积排队；camera_bgr 会在提交时复制。
 configure 的 grab_radius_m/grid/skeleton 是请求，后端自行接收并应用。
-切换到外部输入后，需由集成代码提交数据；本文件不启动摄像头或 MediaPipe。
-内置 3D 为 Canvas 投影预览，可由队友替换为自己的渲染视图。
+原型的 --external 模式需由集成代码提交数据。默认模式由 workbench_app 启动后端。
+只有原立方体原型使用 Canvas 投影；泥坯工作台显示 scene_rgb 实际渲染帧。
 Windows 独立启动时自动启用系统 DPI 感知；字号以 point 绘制，布局按 DPI 缩放。
 更改系统缩放后请重启窗口；嵌入已有 Tk 程序时保留宿主的 DPI 模式。
 """
@@ -104,7 +107,7 @@ def demo_hand(x=0.0, y=0.0, z=0.46, pinching=False):
 class HandWorkbench(tk.Tk):
     """可独立运行，也可由现有主程序导入的窗口。"""
 
-    def __init__(self, demo=True):
+    def __init__(self, demo=True, clay_mode=False):
         enable_high_dpi()
         super().__init__()
         self.ui_scale = max(1.0, round(self.winfo_fpixels("1i") / 96.0, 2))
@@ -119,6 +122,7 @@ class HandWorkbench(tk.Tk):
         self.geometry(f"{width}x{height}+{self.px(30)}+{self.px(30)}")
         self.minsize(min(self.px(1000), width), min(self.px(680), height))
         self.demo = demo
+        self.clay_mode = clay_mode
         self.running = demo
         self.snapshot = None
         self._pending = None
@@ -135,6 +139,9 @@ class HandWorkbench(tk.Tk):
         self._camera_image = None
         self._camera_frame = None
         self._camera_error = False
+        self._scene_image = None
+        self._scene_image_key = None
+        self._scene_frame = None
         self._settings = None
         self._toast = ""
         self._toast_until = 0.0
@@ -143,6 +150,9 @@ class HandWorkbench(tk.Tk):
         self.show_grid = tk.BooleanVar(value=True)
         self.show_hand = tk.BooleanVar(value=True)
         self.auto_demo = tk.BooleanVar(value=True)
+        self.brush_radius = tk.DoubleVar(value=4.875)
+        self.demo_depth = tk.DoubleVar(value=2.2)
+        self.input_source = tk.StringVar(value="demo")
         self.angle = 0.25
         self.object_pos = [0.0, .05, .42]
         self._build()
@@ -266,7 +276,7 @@ class HandWorkbench(tk.Tk):
         frame.pack(fill="both", expand=True)
         tools = tk.Frame(frame, bg=PANEL, height=44)
         tools.pack(fill="x")
-        self.label(tools, "  ◇  方块交互", 10).pack(side="left", padx=10, pady=12)
+        self.label(tools, "  ◇  泥坯与桌面" if self.clay_mode else "  ◇  方块交互", 10).pack(side="left", padx=10, pady=12)
         self.view_label = self.label(tools, "空间预览  /  演示" if self.demo else "空间预览  /  外部输入", 9, MUTED)
         self.view_label.pack(side="right", padx=16)
         self.scene = tk.Canvas(frame, width=394, height=276, bg="#131b24", highlightthickness=0, cursor="hand2")
@@ -279,7 +289,7 @@ class HandWorkbench(tk.Tk):
         self.scene.bind("<Configure>", lambda event: self.draw_scene())
         footer = tk.Frame(frame, bg=PANEL)
         footer.pack(fill="x")
-        self.label(footer, "  拖动物体 · 滚轮旋转", 9, MUTED).pack(side="left", padx=10, pady=10)
+        self.label(footer, "  拖动观察 · 滚轮缩放 · Open3D 同步画面" if self.clay_mode else "  拖动物体 · 滚轮旋转", 9, MUTED).pack(side="left", padx=10, pady=10)
         self.button(footer, "重置场景  R", self.reset_scene, compact=True).pack(side="right", padx=8, pady=5)
         self._build_sidebar()
 
@@ -315,8 +325,8 @@ class HandWorkbench(tk.Tk):
         self.live_label.pack(side="right")
         self.hand_label = self._stat("追踪手部", "右手 · 示意")
         self.gesture_label = self._stat("当前手势", "张掌")
-        self.object_label = self._stat("物体状态", "等待交互")
-        self.distance_label = self._stat("抓取距离", "—")
+        self.object_label = self._stat("泥坯状态" if self.clay_mode else "物体状态", "等待交互")
+        self.distance_label = self._stat("拾取状态" if self.clay_mode else "抓取距离", "—")
         self._rule(pady=12)
         self.label(panel, "下一步", 10, MUTED).pack(anchor="w", padx=18)
         self.hint_label = self.label(panel, "", 11, TEXT, justify="left", wraplength=240)
@@ -324,6 +334,27 @@ class HandWorkbench(tk.Tk):
         self.hint_detail = self.label(panel, "", 9, MUTED, justify="left", wraplength=240)
         self.hint_detail.pack(anchor="w", padx=18, pady=(0, 12))
         self._rule()
+        if self.clay_mode:
+            self.label(panel, "输入源", 10, MUTED).pack(anchor="w", padx=18, pady=(12, 4))
+            menu = tk.OptionMenu(panel, self.input_source, "demo", "webcam", "orbbec", "replay",
+                                 command=lambda value: self._action("source", source=value))
+            menu.configure(bg=CARD, fg=TEXT, highlightthickness=0, font=self.font(10))
+            menu.pack(fill="x", padx=18)
+            self.label(panel, "demo 无相机；replay 使用启动时指定的目录", 8, MUTED,
+                       wraplength=240).pack(anchor="w", padx=18, pady=4)
+            self.dent_button = self.button(panel, "放置演示凹坑", lambda: self._action("dent"), True)
+            self.dent_button.pack(fill="x", padx=18, pady=(8, 4))
+            row = tk.Frame(panel, bg=PANEL)
+            row.pack(fill="x", padx=18)
+            self.button(row, "左转", lambda: self._action("turn", angle=-.15), compact=True).pack(side="left")
+            self.button(row, "右转", lambda: self._action("turn", angle=.15), compact=True).pack(side="left", padx=4)
+            self.button(row, "复位视角", lambda: self._action("view"), compact=True).pack(side="left")
+            for title, variable, low, high in (("演示凹坑半径 / cm", self.brush_radius, 1, 7),
+                                                ("演示凹陷深度 / cm", self.demo_depth, .1, 3)):
+                self.label(panel, title, 9, MUTED).pack(anchor="w", padx=18, pady=(10, 0))
+                tk.Scale(panel, from_=low, to=high, resolution=.1, orient="horizontal", variable=variable,
+                         bg=PANEL, fg=TEXT, troughcolor=BG, highlightthickness=0, font=self.font(9)).pack(fill="x", padx=18)
+            self.button(panel, "应用演示参数", self.configure_request, compact=True).pack(fill="x", padx=18, pady=8)
         switches = tk.Frame(panel, bg=PANEL)
         switches.pack(fill="x", padx=14, pady=9)
         for title, var in [("显示空间网格", self.show_grid), ("显示手部骨架", self.show_hand)]:
@@ -395,6 +426,11 @@ class HandWorkbench(tk.Tk):
         self.notify("演示场景已复位" if self.demo else "已发送场景复位请求")
 
     def configure_request(self):
+        if self.clay_mode:
+            self._action("configure", brush_radius_m=self.brush_radius.get() / 100,
+                         demo_depth_m=self.demo_depth.get() / 100,
+                         grid=self.show_grid.get(), skeleton=self.show_hand.get())
+            return
         self._action("configure", grab_radius_m=self.radius.get() / 100,
                      grid=self.show_grid.get(), skeleton=self.show_hand.get())
         self.draw_scene()
@@ -404,6 +440,9 @@ class HandWorkbench(tk.Tk):
         self._toast_until = time.perf_counter() + 3
 
     def open_settings(self):
+        if self.clay_mode:
+            self.notify("在右侧选择输入源、应用演示参数；真实手输入当前用于骨架显示，尚未接入雕刻")
+            return
         if self._settings is not None and self._settings.winfo_exists():
             self._settings.lift()
             return
@@ -498,8 +537,11 @@ class HandWorkbench(tk.Tk):
         if pending and not self.demo:
             snapshot, camera, stamp = pending
             self._last_frame = stamp
-            if self.running:
+            if self.running or self.clay_mode:
                 self.snapshot = snapshot
+                if self.clay_mode:
+                    self.running = bool(field(snapshot, "running", False))
+                    self.run_button.configure(text="暂停" if self.running else "开始")
                 self._camera_frame = camera
                 self._camera_error = False
                 self._update_camera_image()
@@ -518,6 +560,9 @@ class HandWorkbench(tk.Tk):
         return not self.demo and self.running and self._last_frame > 0 and time.perf_counter() - self._last_frame > 1.5
 
     def _refresh_labels(self):
+        if self.clay_mode:
+            self._refresh_clay_labels()
+            return
         snap = self.snapshot
         hands = field(snap, "hands", ())
         obj = field(snap, "object", {})
@@ -576,6 +621,77 @@ class HandWorkbench(tk.Tk):
                                        f"抓取半径    {radius * 100:.0f} cm\n"
                                        f"重力           {'已启用' if field(obj, 'gravity_active', False) else '未启用'}")
 
+    def _refresh_clay_labels(self):
+        snap = self.snapshot
+        error = field(snap, "error", "")
+        source = field(snap, "source", self.input_source.get())
+        hands = field(snap, "hands", ()) if not self._stale() else ()
+        self.source_badge.configure(text="●  无相机演示" if source == "demo" else f"●  {source}",
+                                    fg=YELLOW if source == "demo" else ACCENT)
+        self.view_label.configure(text="Open3D 实际场景 · 同一泥坯")
+        self.live_label.configure(text="●  输入异常" if error else "●  场景已连接" if field(snap, "scene_rgb") is not None else "○  正在启动",
+                                  fg=YELLOW if error else ACCENT)
+        self.hand_label.configure(text=f"{len(hands)} 只手" if hands else "无输入" if source == "demo" else "未检测到")
+        gestures = ["捏合" if field(h, "pinching") else "张掌" if field(h, "open_palm") else "自然姿态" for h in hands]
+        self.gesture_label.configure(text=" / ".join(gestures) or "—")
+        changed = field(snap, "changed_vertices", 0)
+        self.object_label.configure(text="已变形" if changed else "初始圆柱", fg=ACCENT)
+        self.distance_label.configure(text="未接入拾取")
+        if error:
+            hint, detail = "输入源需要检查", error
+        elif self._stale():
+            hint, detail = "场景快照已中断", "当前保留最后画面，请检查独立三维窗口。"
+        elif not self.running:
+            hint, detail = "已暂停", "可继续观察和复位；开始后可放置演示凹坑。"
+        else:
+            hint, detail = "泥坯与桌面已就绪", field(snap, "message", "正在连接三维场景…")
+        self.hint_label.configure(text=hint)
+        self.hint_detail.configure(text=detail)
+        self.dent_button.configure(state="normal" if self.running and not self._stale() else "disabled")
+        self.preview_caption.configure(text="无相机演示 · 未使用真实手" if source == "demo" else
+                                       "摄像头预览" if self._camera_frame is not None else "输入源未提供图像")
+        self.note.configure(text="真实手当前只显示骨架。\n凹坑按钮用于场景联调，非手势雕刻。")
+        self.debug_label.configure(text=f"顶点数        {field(snap, 'vertex_count', 0)}\n"
+                                       f"网格版本     {field(snap, 'mesh_version', 0)}\n"
+                                       f"变化顶点     {changed}\n"
+                                       f"实际半径     {field(snap, 'brush_radius_m', 0) * 100:.1f} cm\n"
+                                       f"实际深度     {field(snap, 'demo_depth_m', 0) * 100:.1f} cm")
+        status = f"{source} · {'真实深度' if field(snap, 'depth_enabled', False) else '无真实深度'} · 网格 v{field(snap, 'mesh_version', 0)}"
+        if source != "demo":
+            status += f" · 输入 {field(snap, 'fps', 0):.1f} FPS"
+        if not self.running:
+            status += " · 已暂停"
+        if error:
+            status += " · " + error
+        if self._toast_until > time.perf_counter():
+            status = self._toast
+        self.status.configure(text=status)
+
+    def _draw_clay_scene(self):
+        canvas = self.scene
+        canvas.delete("all")
+        width, height = canvas.winfo_width(), canvas.winfo_height()
+        frame = field(self.snapshot, "scene_rgb")
+        if frame is None or width < 20 or height < 20:
+            canvas.create_text(width / 2, height / 2, text=field(self.snapshot, "error") or "正在启动泥坯场景…",
+                               fill=TEXT, font=self.font(13), width=max(20, width - 40))
+            return
+        try:
+            from PIL import Image, ImageTk
+            key = (id(frame), width, height)
+            if key != self._scene_image_key:
+                image = Image.fromarray(frame)
+                image.thumbnail((width, height), Image.Resampling.LANCZOS)
+                self._scene_image = ImageTk.PhotoImage(image)
+                self._scene_image_key = key
+                self._scene_frame = frame
+            canvas.create_image(width / 2, height / 2, image=self._scene_image)
+            if not self.running:
+                canvas.create_text(width / 2, self.px(24), text="已暂停 · 可观察 / 复位", fill=YELLOW, font=self.font(10))
+        except (ImportError, ValueError, TypeError) as exc:
+            canvas.create_text(width / 2, height / 2, text=f"场景预览不可用：{exc}\n请在独立 Open3D 窗口查看",
+                               fill=YELLOW, font=self.font(11), width=max(20, width - 40))
+
     def project(self, point):
         w, h = self.scene.winfo_width(), self.scene.winfo_height()
         scale = min(w / 1.15, h / .78)
@@ -583,6 +699,9 @@ class HandWorkbench(tk.Tk):
         return w * .50 + (x + (z - .5) * .38) * scale, h * .53 + (y + (z - .5) * .52) * scale
 
     def draw_scene(self):
+        if self.clay_mode:
+            self._draw_clay_scene()
+            return
         c = self.scene
         c.delete("all")
         w, h = c.winfo_width(), c.winfo_height()
@@ -710,10 +829,19 @@ class HandWorkbench(tk.Tk):
 
     def _press(self, event):
         self.scene.focus_set()
+        if self.clay_mode:
+            self._drag = (event.x, event.y)
+            return
         if self.demo and self.running and self._hit(event):
             self._drag = (event.x, event.y, self.object_pos[:])
 
     def _move(self, event):
+        if self.clay_mode:
+            if self._drag is not None:
+                x, y = self._drag
+                self._action("orbit", dx=event.x - x, dy=event.y - y)
+                self._drag = (event.x, event.y)
+            return
         if self._drag is None or not self.running:
             return
         x, y, pos = self._drag
@@ -722,12 +850,18 @@ class HandWorkbench(tk.Tk):
                            max(-.23, min(.155, pos[1] + (event.y - y) / scale)), pos[2]]
 
     def _release(self, event):
+        if self.clay_mode:
+            self._drag = None
+            return
         if self._drag is not None:
             self._drag = None
             self.auto_demo.set(False)
             self.notify("已释放演示物体；可在设置中恢复自动演示")
 
     def _wheel(self, event):
+        if self.clay_mode:
+            self._action("zoom", factor=.9 if event.delta > 0 else 1.1)
+            return "break"
         if self.demo and self.running and self._hit(event):
             self.angle += .12 if event.delta > 0 else -.12
 
@@ -742,10 +876,17 @@ class HandWorkbench(tk.Tk):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="独立的手势交互工作台 UI 原型")
+    parser = argparse.ArgumentParser(description="默认启动 Open3D 泥坯工作台；可附加 main.py 的输入源参数")
     parser.add_argument("--external", action="store_true", help="以等待外部快照的模式启动")
-    args = parser.parse_args()
-    HandWorkbench(demo=not args.external).mainloop()
+    parser.add_argument("--legacy-demo", action="store_true", help="查看原立方体 Canvas 原型")
+    args, remaining = parser.parse_known_args()
+    if args.external or args.legacy_demo:
+        if remaining:
+            parser.error("原型模式不接受其他参数")
+        HandWorkbench(demo=not args.external).mainloop()
+    else:
+        from main import main as run
+        return run(remaining)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,8 @@
-"""RGB-D 手部三维交互 —— 最小可运行骨架。
+"""泥坯工作台与 RGB-D 手部三维交互。
+
+默认启动 Tk 工作台和独立 Open3D 泥坯场景，不访问摄像头。
+--source webcam/orbbec/replay 将真实输入骨架显示到固定泥坯旁；
+--no-ui 仅启动三维窗口；--scene cube 保留原立方体抓取演示。
 
 数据流：
 
@@ -11,7 +15,9 @@
 接上 Orbbec 后，同一套上层代码改用 depth + 内参反投影。
 
 运行：
+    python main.py
     python main.py --source webcam
+    python main.py --scene cube --source webcam
     python main.py --source replay --replay-dir data/demo
 """
 from __future__ import annotations
@@ -88,8 +94,11 @@ def initial_object_T(position) -> np.ndarray:
 
 
 def parse_args(argv=None):
-    p = argparse.ArgumentParser(description="RGB-D 手部三维交互（骨架版）")
-    p.add_argument("--source", choices=["webcam", "orbbec", "replay"], default="webcam")
+    p = argparse.ArgumentParser(description="泥坯工作台（默认无相机）；--scene cube 使用原抓取演示")
+    p.add_argument("--source", choices=["demo", "webcam", "orbbec", "replay"], default=None,
+                   help="泥坯默认 demo；原立方体演示默认 webcam")
+    p.add_argument("--scene", choices=["clay", "cube"], default="clay")
+    p.add_argument("--no-ui", action="store_true", help="仅显示独立 Open3D 窗口")
     p.add_argument("--camera", type=int, default=0, help="webcam 设备号")
     p.add_argument("--width", type=int, default=1280)
     p.add_argument("--height", type=int, default=720)
@@ -116,6 +125,16 @@ def parse_args(argv=None):
 
 def main(argv=None) -> int:
     args = parse_args(argv)
+    if args.source is None:
+        args.source = "demo" if args.scene == "clay" else "webcam"
+    if args.scene == "clay":
+        if args.no_ui:
+            from clay_runtime import run_clay
+            return run_clay(args)
+        from workbench_app import launch
+        return launch(args)
+    if args.source == "demo":
+        raise SystemExit("立方体模式请使用 webcam、orbbec 或 replay 数据源")
 
     first_person = args.view == "first"
     # 第一人称 3D 视角下，左边就是用户身体的左边；预览也跟着镜像，
