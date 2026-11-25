@@ -1,0 +1,87 @@
+{
+  "open3d": "0.18.0",
+  "input": "fixed clay-local point/normal; no camera",
+  "vertices": 5282,
+  "triangles": 10560,
+  "clay_radius_m": 0.075,
+  "clay_height_m": 0.18,
+  "brush_radius_m": 0.024,
+  "strength": 1.0,
+  "dt_s": 0.1,
+  "steps": 3,
+  "max_step_depth_m": 0.004,
+  "max_stroke_depth_m": 0.012,
+  "front_sign": -1.0,
+  "front_center_index": 2376,
+  "front_center_initial": [
+    -1.3777276490407722e-17,
+    0.0,
+    -0.075
+  ],
+  "steps_report": [
+    {
+      "step": 1,
+      "selected_vertices": 97,
+      "changed_vertices": 97,
+      "step_depth_m": 0.004,
+      "max_displacement_m": 0.0040000000000000036,
+      "max_total_displacement_m": 0.0040000000000000036,
+      "display_update_ms": 1.5721999807283282,
+      "mesh_version": 2
+    },
+    {
+      "step": 2,
+      "selected_vertices": 97,
+      "changed_vertices": 97,
+      "step_depth_m": 0.004,
+      "max_displacement_m": 0.0040000000000000036,
+      "max_total_displacement_m": 0.008000000000000007,
+      "display_update_ms": 1.6457999590784311,
+      "mesh_version": 3
+    },
+    {
+      "step": 3,
+      "selected_vertices": 89,
+      "changed_vertices": 89,
+      "step_depth_m": 0.004,
+      "max_displacement_m": 0.00399999999999999,
+      "max_total_displacement_m": 0.011999999999999997,
+      "display_update_ms": 0.8960999548435211,
+      "mesh_version": 4
+    }
+  ],
+  "changed_vertices": 97,
+  "max_total_displacement_m": 0.011999999999999997,
+  "backside_changed_vertices": 0,
+  "cap_changed_vertices": 0,
+  "backside_unchanged": true,
+  "caps_unchanged": true,
+  "display_update_ms_mean": 1.3713666315500934,
+  "display_update_ms_max": 1.6457999590784311,
+  "front_neighbors_symmetric": true,
+  "front_neighbor_displacements_m": [
+    0.01069113835446904,
+    0.010691138354469068
+  ],
+  "seam_selection": {
+    "center_inside": true,
+    "left_inside": true,
+    "right_inside": true,
+    "left_weight": 0.8916493274288931,
+    "right_weight": 0.8916493274288949
+  },
+  "seam_selection_symmetric": true,
+  "geometry": {
+    "watertight": true,
+    "orientable": true,
+    "self_intersecting": false,
+    "min_triangle_area_m2": 8.836241987698415e-06,
+    "min_side_outward_dot": 1.110249218721187e-06,
+    "all_finite": true
+  },
+  "display_matches_current_mesh": true,
+  "display_geometry_reused": true,
+  "backside_screenshot": "03-backside.png",
+  "reset_restores_initial_shape": true,
+  "final_mesh_version": 7
+}
